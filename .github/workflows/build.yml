@@ -47,8 +47,15 @@ jobs:
           path: ~/.espressif
           key: espressif-${{ runner.os }}-${{ hashFiles('esp-idf/tools/tools.json', 'esp-idf/version.txt') }}
 
+      # The repo was committed without exec bits (e.g. from Windows),
+      # so restore them on the scripts ESP-IDF runs directly.
+      - name: Fix script permissions
+        run: |
+          find esp-idf -maxdepth 1 -name "*.sh" -exec chmod +x {} +
+          find esp-idf/tools -type f \( -name "*.sh" -o -name "*.py" \) -exec chmod +x {} +
+
       - name: Install ESP-IDF toolchain
-        run: ./esp-idf/install.sh esp32
+        run: bash ./esp-idf/install.sh esp32
 
       - name: Build
         run: |
