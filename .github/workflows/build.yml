@@ -1,0 +1,104 @@
+name: Build firmware
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build pure_sink (ESP32)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git wget flex bison gperf cmake ninja-build ccache \
+            libffi-dev libssl-dev dfu-util libusb-1.0-0
+
+      # The bundled ESP-IDF installs its toolchain into ~/.espressif
+      - name: Cache ESP-IDF tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.espressif
+          key: espressif-${{ runner.os }}-${{ hashFiles('esp-idf/tools/tools.json', 'esp-idf/version.txt') }}
+
+      - name: Install ESP-IDF toolchain
+        run: ./esp-idf/install.sh esp32
+
+      - name: Build
+        run: |
+          . ./esp-idf/export.sh
+          idf.py -C native_bt/pure_sink build
+
+      # Bootloader + partition table + app in one image, flashed at 0x0
+      - name: Merge into single binary
+        run: |
+          . ./esp-idf/export.sh
+          idf.py -C native_bt/pure_sink merge-bin -o merged-binary.bin
+          ls -lh native_bt/pure_sink/build/merged-binary.bin
+
+      - name: Collect artifacts
+        run: |
+          B=native_bt/pure_sink/build
+          mkdir -p dist
+          cp "$B"/*.bin "$B"/*.elf "$B"/*.map dist/ 2>/dev/null || true
+          cp "$B"/merged-binary.bin dist/esp32-hifi-a2dp-sink-merged.bin
+          cp "$B"/bootloader/bootloader.bin dist/
+          cp "$B"/partition_table/partition-table.bin dist/
+          cp "$B"/flasher_args.json dist/ 2>/dev/null || true
+          ls -lh dist
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: pure_sink-esp32-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download firmware
+        uses: actions/download-artifact@v4
+        with:
+          name: pure_sink-esp32-${{ github.sha }}
+          path: dist
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/*.bin
+            dist/flasher_args.json
