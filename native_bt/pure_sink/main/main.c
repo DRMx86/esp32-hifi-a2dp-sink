@@ -43,7 +43,7 @@ _Static_assert(PURE_SINK_HOST_PRIORITY < ESP_TASK_BT_CONTROLLER_PRIO, "The host 
 _Static_assert(CONFIG_BTDM_CTRL_PINNED_TO_CORE == 1 && CONFIG_ESP_MAIN_TASK_AFFINITY == 1,
                "Controller and host owner share core 1; core 0 is reserved for decoding");
 
-#define DEVICE_NAME "BDK SPEAKER"
+#define DEVICE_NAME "DM32 HiFi"
 #define L2CAP_RX_MAX 4096u
 #define PAIRING_WINDOW_MS 120000u
 #define INITIAL_VOLUME 100u /* AVRCP 0..127 (about -11 dB); the phone sets its own level on connect */
