@@ -47,12 +47,21 @@ jobs:
           path: ~/.espressif
           key: espressif-${{ runner.os }}-${{ hashFiles('esp-idf/tools/tools.json', 'esp-idf/version.txt') }}
 
-      # The repo was committed without exec bits (e.g. from Windows),
-      # so restore them on the scripts ESP-IDF runs directly.
-      - name: Fix script permissions
+      # The repo was committed from Windows: text files have CRLF line endings
+      # (breaks shell scripts and shebangs) and scripts lost their exec bits.
+      - name: Normalize line endings and permissions
         run: |
+          # CRLF -> LF in every text file containing CRs (binary files are skipped)
+          grep -rIlZP '\r$' esp-idf native_bt --exclude-dir=.git \
+            | xargs -0 -r sed -i 's/\r$//'
+          # restore exec bit on scripts ESP-IDF runs directly
           find esp-idf -maxdepth 1 -name "*.sh" -exec chmod +x {} +
           find esp-idf/tools -type f \( -name "*.sh" -o -name "*.py" \) -exec chmod +x {} +
+          # sanity check: fail early if install.sh still has CRLF
+          if grep -q $'\r' esp-idf/install.sh; then
+            echo "install.sh still has CRLF line endings" >&2
+            exit 1
+          fi
 
       - name: Install ESP-IDF toolchain
         run: bash ./esp-idf/install.sh esp32
