@@ -4,8 +4,8 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 
-#define STATUS_LED_GPIO        22
-#define STATUS_LED_ACTIVE_LOW  1   /* 1: 3V3 -> R -> LED anode, LED cathode -> GPIO22 (lit when pin is low)
+#define STATUS_LED_GPIO        2
+#define STATUS_LED_ACTIVE_LOW  1   /* 1: 3V3 -> R -> LED anode, LED cathode -> GPIO2 (lit when pin is low)
                                       0: GPIO22 -> R -> LED anode, LED cathode -> GND (lit when pin is high) */
 #define SLOW_TOGGLE_US         500000
 #define FAST_TOGGLE_US         150000
