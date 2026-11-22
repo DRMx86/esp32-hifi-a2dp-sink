@@ -2,7 +2,7 @@ name: Build firmware
 
 on:
   push:
-    branches: [main]
+    branches: [main, d1mini32]
     tags: ["v*"]
     paths-ignore:
       - "docs/**"
@@ -17,9 +17,12 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  BOARD: d1mini32
+
 jobs:
   build:
-    name: Build pure_sink (ESP32)
+    name: Build pure_sink (ESP32, ${{ env.BOARD }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -83,7 +86,7 @@ jobs:
           B=native_bt/pure_sink/build
           mkdir -p dist
           cp "$B"/*.bin "$B"/*.elf "$B"/*.map dist/ 2>/dev/null || true
-          cp "$B"/merged-binary.bin dist/esp32-hifi-a2dp-sink-merged.bin
+          cp "$B"/merged-binary.bin dist/esp32-hifi-a2dp-sink-${BOARD}-merged.bin
           cp "$B"/bootloader/bootloader.bin dist/
           cp "$B"/partition_table/partition-table.bin dist/
           cp "$B"/flasher_args.json dist/ 2>/dev/null || true
@@ -92,7 +95,7 @@ jobs:
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
-          name: pure_sink-esp32-${{ github.sha }}
+          name: pure_sink-esp32-${{ env.BOARD }}-${{ github.sha }}
           path: dist/
           if-no-files-found: error
           retention-days: 30
@@ -108,7 +111,7 @@ jobs:
       - name: Download firmware
         uses: actions/download-artifact@v4
         with:
-          name: pure_sink-esp32-${{ github.sha }}
+          name: pure_sink-esp32-${{ env.BOARD }}-${{ github.sha }}
           path: dist
 
       - name: Create release
