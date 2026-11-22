@@ -22,8 +22,8 @@ static const uint8_t sink_class[] = {0x35, 3, 0x19, 0x11, 0x0b};
 static const uint8_t sink_protocol[] = {0x35, 16, 0x35, 6, 0x19, 1, 0, 9, 0, 0x19, 0x35, 6, 0x19, 0, 0x19, 9, 1, 3};
 static const uint8_t sink_profile[] = {0x35, 8, 0x35, 6, 0x19, 0x11, 0x0d, 9, 1, 3};
 static const uint8_t sink_features[] = {9, 0, 2}; /* speaker */
-static const uint8_t sink_name[] = "\x25\x09"
-                                   "HiFi DM32";
+static const uint8_t sink_name[] = "\x25\x0b"
+                                   "HiFi Mini32";
 static const dbt_sdp_attribute_t sink_attributes[] = {
     {1, sizeof(sink_class), sink_class},       {4, sizeof(sink_protocol), sink_protocol},
     {5, sizeof(browse), browse},               {6, sizeof(language), language},
