@@ -10,8 +10,8 @@
 #include "dbt_queue.h" /* dbt_result_t */
 
 /* PCM5102A wiring (no MCLK). */
-#define AUDIO_OUT_GPIO_BCLK 27
-#define AUDIO_OUT_GPIO_WS 25
+#define AUDIO_OUT_GPIO_BCLK 25
+#define AUDIO_OUT_GPIO_WS 27
 #define AUDIO_OUT_GPIO_DATA 26
 
 /* Audio buffered (encoded queue + PCM ring + I2S DMA) when playback starts or
