@@ -35,6 +35,7 @@
 #include "pure_sink.h"
 #include "sdkconfig.h"
 #include "sink_avrcp.h"
+#include "status_led.h"
 
 #if !CONFIG_IDF_TARGET_ESP32 || !CONFIG_BT_CONTROLLER_ONLY || !CONFIG_BTDM_CTRL_MODE_BTDM
 #error "pure_sink requires the original ESP32, controller-only Bluetooth and dual-mode controller"
@@ -293,6 +294,7 @@ void app_main(void) {
     owner = xTaskGetCurrentTaskHandle();
     vTaskPrioritySet(owner, PURE_SINK_HOST_PRIORITY);
     ESP_LOGI(TAG, "%s: pure A2DP sink on the native_bt host", DEVICE_NAME);
+    status_led_init();
     pure_sink_heap_log("boot");
 
     /* NVS holds the Classic bonds (namespace native_bonds). */
@@ -432,6 +434,10 @@ void app_main(void) {
         if (runtime.ready && rx_ready && gap.state == DBT_GAP_IDLE) (void)dbt_gap_start(&gap);
         dbt_gap_poll(&gap, now);
         bool discoverable = window || !classic_encrypted();
+        status_led_set(!(runtime.ready && gap.state == DBT_GAP_READY) ? STATUS_LED_OFF
+                       : classic_encrypted()                          ? STATUS_LED_CONNECTED
+                       : window                                       ? STATUS_LED_PAIRING
+                                                                      : STATUS_LED_DISCOVERABLE);
         uint8_t wanted_scan = (uint8_t)((discoverable ? 1u : 0u) | 2u);
         bool scan_mismatch = gap.state == DBT_GAP_READY && !gap.classic_pending && gap.classic_scan != wanted_scan;
         if (scan_mismatch && services) (void)dbt_gap_set_classic_scan(&gap, discoverable, true);
