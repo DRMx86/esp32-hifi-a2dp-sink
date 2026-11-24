@@ -1,17 +1,16 @@
-name: Build firmware
+name: Build firmware (esp32-hifi-oled)
 
 on:
   push:
-    branches: [main]
-    tags: ["v*"]
+    branches: [esp32-hifi-oled]
+    tags: ["esp32-hifi-oled-v*"]
     paths-ignore:
       - "docs/**"
       - "**.md"
-  pull_request:
   workflow_dispatch:
 
 concurrency:
-  group: build-${{ github.ref }}
+  group: build-esp32-hifi-oled-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -19,7 +18,7 @@ permissions:
 
 jobs:
   build:
-    name: Build pure_sink (ESP32)
+    name: Build pure_sink (ESP32, OLED)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -83,7 +82,7 @@ jobs:
           B=native_bt/pure_sink/build
           mkdir -p dist
           cp "$B"/*.bin "$B"/*.elf "$B"/*.map dist/ 2>/dev/null || true
-          cp "$B"/merged-binary.bin dist/esp32-hifi-a2dp-sink-merged.bin
+          cp "$B"/merged-binary.bin dist/esp32-hifi-a2dp-sink-oled-merged.bin
           cp "$B"/bootloader/bootloader.bin dist/
           cp "$B"/partition_table/partition-table.bin dist/
           cp "$B"/flasher_args.json dist/ 2>/dev/null || true
@@ -92,7 +91,7 @@ jobs:
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
-          name: pure_sink-esp32-${{ github.sha }}
+          name: pure_sink-esp32-oled-${{ github.sha }}
           path: dist/
           if-no-files-found: error
           retention-days: 30
@@ -100,7 +99,7 @@ jobs:
   release:
     name: Publish release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/esp32-hifi-oled-v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -108,7 +107,7 @@ jobs:
       - name: Download firmware
         uses: actions/download-artifact@v4
         with:
-          name: pure_sink-esp32-${{ github.sha }}
+          name: pure_sink-esp32-oled-${{ github.sha }}
           path: dist
 
       - name: Create release
