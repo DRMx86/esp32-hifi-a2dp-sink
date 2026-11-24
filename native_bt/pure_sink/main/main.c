@@ -32,6 +32,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
+#include "oled_display.h"
 #include "pure_sink.h"
 #include "sdkconfig.h"
 #include "sink_avrcp.h"
@@ -91,17 +92,17 @@ static void periodic_log(void) {
     last_at = at;
     audio_out_stats_t s;
     audio_out_stats(&s);
-    TaskHandle_t decoder = a2dp_sink_decoder_task(), writer = audio_out_task();
+    TaskHandle_t decoder = a2dp_sink_decoder_task(), writer = audio_out_task(), oled = oled_display_task();
     uint32_t rate = s.rate ? s.rate : 48000u;
     ESP_LOGI(TAG,
-             "heap free %u min %u largest %u | stack free: decoder %u, i2s %u, host %u | codec %s %" PRIu32
+             "heap free %u min %u largest %u | stack free: decoder %u, i2s %u, host %u, oled %u | codec %s %" PRIu32
              " B | ring %" PRIu32 "/%" PRIu32 " ms (target %" PRIu32 ") %s | vol %u | underruns %" PRIu32
              ", slips -%" PRIu32 "/+%" PRIu32 " | encoded %" PRIu32 " ms | media dropped %" PRIu32 ", rejected %" PRIu32
              " | decoder busy %u%%",
              (unsigned)heap_caps_get_free_size(caps), (unsigned)heap_caps_get_minimum_free_size(caps),
              (unsigned)heap_caps_get_largest_free_block(caps), decoder ? (unsigned)uxTaskGetStackHighWaterMark(decoder) : 0u,
              writer ? (unsigned)uxTaskGetStackHighWaterMark(writer) : 0u, (unsigned)uxTaskGetStackHighWaterMark(NULL),
-             a2dp_sink_codec_label(), a2dp_sink_codec_bytes(), s.level_frames * 1000u / rate,
+             oled ? (unsigned)uxTaskGetStackHighWaterMark(oled) : 0u, a2dp_sink_codec_label(), a2dp_sink_codec_bytes(), s.level_frames * 1000u / rate,
              s.capacity_frames * 1000u / rate, s.target_frames * 1000u / rate, s.playing ? "playing" : "idle",
              s.volume, s.underruns, s.dropped_frames, s.repeated_frames, s.queued_frames * 1000u / rate,
              a2dp_sink_media_dropped(), a2dp_sink_media_rejected(), busy_pct);
@@ -290,6 +291,41 @@ static void log_avrcp(void) {
     }
 }
 
+/* Collect what the OLED shows and hand it over when it differs from the last hand-over. Cheap enough to run
+ * on every pass of the host loop; the loop already wakes for every event that changes any of these values. */
+static void update_oled(bool pairing_window) {
+    static sink_avrcp_snapshot_t view;
+    static oled_info_t info, sent;
+    static bool have_sent;
+    memset(&info, 0, sizeof info);
+    info.play_status = OLED_PLAY_UNKNOWN;
+    info.pairing = pairing_window;
+    const bool avrcp = sink_avrcp_snapshot(&view) == DBT_OK && view.connected;
+    const bool streaming = a2dp_sink_streaming();
+    info.link = streaming ? OLED_LINK_STREAMING
+                : (a2dp_sink_connected() || avrcp || classic_encrypted()) ? OLED_LINK_CONNECTED : OLED_LINK_IDLE;
+    if (info.link != OLED_LINK_IDLE) {
+        snprintf(info.codec, sizeof info.codec, "%s", a2dp_sink_codec_label());
+        audio_out_stats_t s;
+        audio_out_stats(&s);
+        info.volume = s.volume;
+        if (streaming && s.rate) {
+            info.rate = s.rate;
+            info.sample_bytes = s.sample_bytes;
+        }
+        if (avrcp) {
+            info.play_status = view.playback_status;
+            snprintf(info.title, sizeof info.title, "%s", view.title);
+            snprintf(info.artist, sizeof info.artist, "%s", view.artist);
+            snprintf(info.album, sizeof info.album, "%s", view.album);
+        }
+    }
+    if (have_sent && memcmp(&info, &sent, sizeof info) == 0) return;
+    sent = info;
+    have_sent = true;
+    oled_display_publish(&info);
+}
+
 void app_main(void) {
     owner = xTaskGetCurrentTaskHandle();
     vTaskPrioritySet(owner, PURE_SINK_HOST_PRIORITY);
@@ -308,6 +344,7 @@ void app_main(void) {
     /* Allocate the PCM ring first, while the heap is unfragmented. */
     if (audio_out_init() != ESP_OK) park("audio output");
     audio_out_set_volume(INITIAL_VOLUME);
+    if (!oled_display_init(DEVICE_NAME)) ESP_LOGW(TAG, "OLED task not started (out of memory)");
 
     dbt_transport_t transport = {0, transport_ready, transport_send};
     dbt_runtime_hooks_t hooks = {0};
@@ -474,6 +511,7 @@ void app_main(void) {
         }
         if (restart_at && due(now, restart_at)) esp_restart();
         if (services) log_avrcp();
+        update_oled(window);
         bool streaming = a2dp_sink_streaming();
         if (streaming && until(now, next_heap_log) > HEAP_LOG_STREAMING_MS) next_heap_log = now + HEAP_LOG_STREAMING_MS;
         if (due(now, next_heap_log)) {

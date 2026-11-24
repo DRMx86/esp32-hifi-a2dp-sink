@@ -126,6 +126,27 @@ partition, so the bootloader always starts the factory app at 0x10000. Console: 
 Using the speaker with a Windows PC (codec switching, AAC, troubleshooting): see
 [docs/windows-pc.md](../../docs/windows-pc.md).
 
+## OLED display (optional)
+
+An SSD1306 module (I2C, 128x64 or 128x32) shows the phone's AVRCP metadata: title (large, scrolls when too wide),
+artist, album, plus a status bar with play/pause icon, codec, sample rate/bit depth and volume. With no phone it
+shows the device name and "Waiting for phone" / "Pairing mode...". The panel is switched off after 5 minutes without a
+phone (burn-in) and on again when one connects. No panel attached is fine: the task just probes the bus every 5 s.
+
+| Signal | Default | Override (`-D` in `main/CMakeLists.txt`) |
+|---|---|---|
+| SDA | GPIO21 | `OLED_GPIO_SDA` |
+| SCL | GPIO19 | `OLED_GPIO_SCL` |
+| I2C address | 0x3C | `OLED_I2C_ADDR` (0x3D for some modules) |
+| Height | 64 | `OLED_HEIGHT=32` |
+| Rotate 180° | off | `OLED_FLIP=1` |
+| Idle power-off | 300000 ms | `OLED_IDLE_OFF_MS` (0 = never) |
+
+GPIO22 is the status LED, so the usual 21/22 pair is not used. The display runs in its own priority-1 task on core 0
+and only receives a copy of the state from the host loop, so it never calls into the Bluetooth stack. The text
+renderer (`main/oled_render.c`) has no ESP-IDF dependency; `host_test/oled_render_test.c` builds on a PC (see its
+header for the command) and can dump every screen as an image.
+
 ## Intentionally left out
 
 BLE (advertising, GATT, LE SMP, BLE control/OTA), RFCOMM/SPP, HFP/SCO,
